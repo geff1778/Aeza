@@ -8,7 +8,7 @@
 #
 # Проверка:
 #   ./run.sh verify       проверить запущенный стек по HTTP (57 проверок)
-#   ./run.sh test         backend-тесты (pytest, 101 тест)
+#   ./run.sh test         backend-тесты (pytest, 106 тестов)
 #   ./run.sh e2e          браузерные тесты (Playwright, 42 теста)
 #   ./run.sh check        статические проверки (build, typecheck, lint)
 #   ./run.sh full         up + seed + verify + test + check
