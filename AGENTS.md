@@ -35,8 +35,9 @@ is needed, waits for API health, and wraps every check.
 ./run.sh verify         # 57 live HTTP checks against the running stack
 ./run.sh test           # 106 backend tests (starts its own test DB)
 ./run.sh e2e            # 42 Playwright tests (desktop + mobile)
-./run.sh check          # build + typecheck + lint
-./run.sh full           # seed + verify + test + check
+./run.sh check          # run.sh tests + build + typecheck + lint
+./run.sh full           # up + seed + verify + test + check
+./run.sh doctor         # Docker + stack diagnostics (no secrets)
 ./run.sh creds          # demo credentials from .env
 ./run.sh logs worker    # follow a service log
 ./run.sh reset          # down -v (destroys data, asks for confirmation)
@@ -76,6 +77,14 @@ backend/.venv/bin/python scripts/verify_stack.py
 - **pytest needs its own PostgreSQL** on `TEST_DB_PORT` (default 55432) with user
   `invoice`. `./run.sh test` starts it in a container; running `pytest` directly
   requires it to exist already. Tests never touch the dev database.
+- **Docker usually needs `sudo` here** (the user is not in the `docker` group), so
+  `run.sh` resolves `sudo docker` automatically. When the daemon is unreachable it
+  prints diagnostics plus fix hints; `./run.sh doctor` shows the same on demand.
+  It only ever deletes `/var/run/docker.pid` when the PID inside is dead — a live
+  daemon is never disturbed.
+- **`tests/test_run_sh.sh` covers that pidfile logic** with a stub pidfile
+  (`DOCKER_PIDFILE`) and runs as part of `./run.sh check`. It never touches the
+  real `/var/run/docker.pid` and never starts a daemon.
 
 ## Demo credentials
 

@@ -18,6 +18,7 @@
 | Линтер frontend | **успешно, 0 ошибок и предупреждений** | `cd frontend && npm run lint` |
 | E2E (Playwright, desktop + mobile) | **42 passed, 0 failed** | `cd frontend && npx playwright test` |
 | Проверка запущенного стека | **57 passed, 0 failed** | `python scripts/verify_stack.py` |
+| Логика `run.sh` (pidfile, диагностика) | **12 passed, 0 failed** | `bash tests/test_run_sh.sh` |
 | Миграции | **применяются, повторный запуск безопасен** | `alembic upgrade head` дважды |
 | Docker Compose | **4 сервиса healthy** | `docker compose up --build -d`, `docker compose ps` |
 | Persistence после перезапуска | **данные сохранены, дублей нет** | счётчики до/после `docker compose restart` |

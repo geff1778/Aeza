@@ -20,6 +20,7 @@
 #   ./run.sh open         открыть веб-панель в браузере
 #   ./run.sh down         остановить (данные сохраняются)
 #   ./run.sh reset        остановить и УДАЛИТЬ данные (volumes)
+#   ./run.sh doctor       диагностика Docker и состояния стека
 #   ./run.sh help         эта справка
 #
 set -euo pipefail
@@ -52,31 +53,123 @@ fail()  { printf '%s\n' "${RED}ОШИБКА:${RESET} $*" >&2; exit 1; }
 title() { printf '\n%s\n' "${BOLD}$*${RESET}"; }
 
 # ---------------------------------------------------------------- Docker
+DOCKERD_LOG="${DOCKERD_LOG:-/tmp/dockerd-invoice-keeper.log}"
+# Переопределяется в тестах, чтобы не трогать настоящий pidfile.
+DOCKER_PIDFILE="${DOCKER_PIDFILE:-/var/run/docker.pid}"
+
+# Доступен ли демонстрационный сокет (напрямую или через sudo).
+daemon_reachable() {
+  docker info >/dev/null 2>&1 && return 0
+  sudo -n docker info >/dev/null 2>&1 && return 0
+  return 1
+}
+
+# Читает PID из pidfile. Пусто, если файла нет или он нечитаем.
+docker_pidfile_pid() {
+  sudo -n cat "$DOCKER_PIDFILE" 2>/dev/null | tr -d '[:space:]' || true
+}
+
+pid_alive() {
+  [ -n "${1:-}" ] && kill -0 "$1" 2>/dev/null
+}
+
+# Убирает только заведомо устаревший pidfile (PID не существует).
+cleanup_stale_pidfile() {
+  local pid
+  pid="$(docker_pidfile_pid)"
+  [ -z "$pid" ] && return 0
+  if pid_alive "$pid"; then
+    return 1   # процесс жив — pidfile трогать нельзя
+  fi
+  warn "Найден устаревший $DOCKER_PIDFILE (PID $pid не существует) — удаляю"
+  sudo -n rm -f "$DOCKER_PIDFILE" 2>/dev/null || true
+  return 0
+}
+
+# Печатает понятную диагностику. Секретов не раскрывает.
+docker_diagnostics() {
+  echo
+  info "Docker:"
+  printf '     docker:          %s\n' "$(command -v docker 2>/dev/null || echo 'не найден')"
+  printf '     compose v2:      %s\n' "$(docker compose version 2>/dev/null || echo 'не найден')"
+  printf '     пользователь:    %s\n' "$(id -un 2>/dev/null || echo '?')"
+  if id -nG 2>/dev/null | tr ' ' '\n' | grep -qx docker; then
+    printf '     группа docker:   да\n'
+  else
+    printf '     группа docker:   нет  (нужен sudo для docker)\n'
+  fi
+  printf '     socket:          %s\n' "$(ls -l /var/run/docker.sock 2>/dev/null || echo 'нет /var/run/docker.sock')"
+  printf '     pidfile:         %s\n' "$(docker_pidfile_pid | sed 's/^$/нет/')"
+  printf '     dockerd процесс: %s\n' "$( (pgrep -x dockerd 2>/dev/null || true) | tr '\n' ' ' | sed 's/ $//;s/^$/нет/')"
+  printf '     демон отвечает:  %s\n' "$(daemon_reachable && echo 'да' || echo 'НЕТ')"
+  # Лог полезен только когда демон не поднялся.
+  if ! daemon_reachable && [ -s "$DOCKERD_LOG" ]; then
+    printf '     последние строки %s:\n' "$DOCKERD_LOG"
+    tail -3 "$DOCKERD_LOG" | sed 's/^/       /'
+  fi
+  echo
+}
+
+# Что делать пользователю. Печатается только при неудаче.
+docker_help() {
+  warn "Как починить:"
+  cat <<'HINT'
+     1) Если sudo требует пароль — запустите скрипт с уже активным sudo:
+          sudo -v && ./run.sh
+     2) Если вы не в группе docker (каждый раз нужен sudo):
+          sudo usermod -aG docker "$USER"   # затем выйдите и войдите снова
+     3) Если демон не запущен — запустите его вручную в отдельном терминале:
+          sudo dockerd
+        (или как сервис:  sudo systemctl enable --now docker)
+     4) Если остался устаревший pidfile после жёсткого падения:
+          sudo rm -f /var/run/docker.pid && sudo dockerd
+     5) Подробная диагностика этого окружения:
+          ./run.sh doctor
+HINT
+}
+
 resolve_docker() {
   command -v docker >/dev/null 2>&1 || fail "Docker не установлен. См. https://docs.docker.com/engine/install/"
 
   if docker info >/dev/null 2>&1; then
     DOCKER=(docker)
   elif command -v sudo >/dev/null 2>&1 && sudo -n docker info >/dev/null 2>&1; then
-    # daemon работает, но нужен sudo: пользователь не в группе docker
+    # Демон работает, но нужен sudo: пользователь не в группе docker.
     DOCKER=(sudo docker)
     warn "Использую 'sudo docker' (пользователь не в группе docker)"
     warn "Убрать sudo: sudo usermod -aG docker \$USER  (затем перелогиниться)"
   else
-    warn "Docker daemon недоступен, пробую запустить..."
-    if command -v sudo >/dev/null 2>&1; then
-      sudo -n dockerd >/tmp/dockerd-invoice-keeper.log 2>&1 &
-      for _ in $(seq 1 30); do
-        sleep 1
-        sudo -n docker info >/dev/null 2>&1 && break
-      done
+    # Демон недоступен. Пробуем поднять его сами — но только безопасно.
+    if ! command -v sudo >/dev/null 2>&1; then
+      docker_diagnostics
+      fail "Docker daemon недоступен, и sudo отсутствует. Запустите dockerd вручную."
     fi
+    if ! sudo -n true 2>/dev/null; then
+      docker_diagnostics
+      warn "sudo требует пароль, поэтому автоматический запуск демона невозможен."
+      docker_help
+      fail "Docker daemon недоступен."
+    fi
+
+    warn "Docker daemon недоступен, пробую запустить..."
+
+    # Устаревший pidfile мешает старту — но удаляем только если PID мёртв.
+    cleanup_stale_pidfile || true
+
+    sudo -n dockerd >"$DOCKERD_LOG" 2>&1 &
+    for _ in $(seq 1 30); do
+      sleep 1
+      daemon_reachable && break
+    done
+
     if sudo -n docker info >/dev/null 2>&1; then
       DOCKER=(sudo docker)
     elif docker info >/dev/null 2>&1; then
       DOCKER=(docker)
     else
-      fail "Docker daemon не запускается. Запустите вручную: sudo dockerd &"
+      docker_diagnostics
+      docker_help
+      fail "Docker daemon не запускается автоматически."
     fi
   fi
 
@@ -87,6 +180,29 @@ resolve_docker() {
   else
     fail "Не найден 'docker compose'. Установите Docker Compose v2."
   fi
+}
+
+cmd_doctor() {
+  title "Диагностика окружения"
+  docker_diagnostics
+  if daemon_reachable; then
+    resolve_docker
+    ok "Docker daemon доступен (${DOCKER[*]})"
+    "${DOCKER[@]}" version --format '     server: {{.Server.Version}}' 2>/dev/null || true
+    "${COMPOSE[@]}" version 2>/dev/null | sed 's/^/     /' || true
+  else
+    warn "Docker daemon недоступен."
+    docker_help
+  fi
+  title "Состояние стека"
+  if daemon_reachable; then
+    resolve_docker
+    "${COMPOSE[@]}" ps 2>/dev/null || true
+  else
+    info "Пропускаю: демон недоступен"
+  fi
+  echo
+  info "Порт 8080: $( (command -v ss >/dev/null && ss -ltn 2>/dev/null | grep -q ':8080 ') && echo 'занят' || echo 'свободен')"
 }
 
 # ---------------------------------------------------------------- .env
@@ -249,6 +365,11 @@ cmd_e2e() {
 }
 
 cmd_check() {
+  title "Проверка скриптов"
+  bash -n run.sh
+  bash tests/test_run_sh.sh
+  ok "run.sh: синтаксис и логика pidfile в порядке"
+
   title "Статические проверки frontend"
   ensure_frontend_modules
   ( cd frontend && npm run build && npm run typecheck && npm run lint )
@@ -330,10 +451,15 @@ print_access() {
 }
 
 cmd_help() {
-  sed -n '3,24p' "$0" | sed 's/^# \{0,1\}//'
+  sed -n '3,25p' "$0" | sed 's/^# \{0,1\}//'
 }
 
 # ---------------------------------------------------------------- dispatch
+# При `source run.sh` (используется тестами) только загружаем функции.
+if [ "${BASH_SOURCE[0]}" != "$0" ]; then
+  return 0 2>/dev/null || true
+fi
+
 case "${1:-up}" in
   up|"")       cmd_up ;;
   seed|demo)   cmd_seed ;;
@@ -348,6 +474,7 @@ case "${1:-up}" in
   open)        cmd_open ;;
   down|stop)   cmd_down ;;
   reset)       cmd_reset ;;
+  doctor|diag) cmd_doctor ;;
   help|-h|--help) cmd_help ;;
   *)
     warn "Неизвестная команда: $1"
