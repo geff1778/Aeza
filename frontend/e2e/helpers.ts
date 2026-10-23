@@ -1,13 +1,13 @@
 import { expect, type Page } from '@playwright/test'
 
 export const ADMIN = {
-  username: process.env.E2E_ADMIN_USERNAME ?? 'admin',
-  password: process.env.E2E_ADMIN_PASSWORD ?? 'DemoAdmin123!',
+  username: process.env.E2E_ADMIN_USERNAME ?? process.env.ADMIN_USERNAME ?? 'admin',
+  password: process.env.E2E_ADMIN_PASSWORD ?? process.env.ADMIN_PASSWORD ?? 'DemoAdmin123!',
 }
 
 export const USER = {
-  username: process.env.E2E_USER_USERNAME ?? 'demo_user',
-  password: process.env.E2E_USER_PASSWORD ?? 'DemoUser123!',
+  username: process.env.E2E_USER_USERNAME ?? process.env.DEMO_USERNAME ?? 'demo_user',
+  password: process.env.E2E_USER_PASSWORD ?? process.env.DEMO_PASSWORD ?? 'DemoUser123!',
 }
 
 /** Unique suffix so repeated runs never collide on titles. */

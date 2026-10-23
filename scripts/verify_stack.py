@@ -11,6 +11,7 @@ Exit code 0 means every check passed.
 from __future__ import annotations
 
 import os
+import pathlib
 import sys
 from datetime import date, timedelta
 from decimal import Decimal
@@ -20,9 +21,36 @@ import httpx
 BASE = sys.argv[1] if len(sys.argv) > 1 else os.getenv("VERIFY_BASE_URL", "http://localhost:8080")
 API = f"{BASE}/api/v1"
 
-# Defaults match the synthetic demo accounts; override on a real stand.
-ADMIN = (os.getenv("VERIFY_ADMIN_USERNAME", "admin"), os.getenv("VERIFY_ADMIN_PASSWORD", "DemoAdmin123!"))
-USER = (os.getenv("VERIFY_USER_USERNAME", "demo_user"), os.getenv("VERIFY_USER_PASSWORD", "DemoUser123!"))
+
+def _env_file_values() -> dict[str, str]:
+    """Read the repo .env so the checks match the running stack's credentials."""
+    path = pathlib.Path(__file__).resolve().parent.parent / ".env"
+    values: dict[str, str] = {}
+    if not path.is_file():
+        return values
+    for line in path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, _, value = line.partition("=")
+        values[key.strip()] = value.strip()
+    return values
+
+
+_FILE_ENV = _env_file_values()
+
+
+def _cred(env_key: str, file_key: str, default: str) -> str:
+    """Precedence: explicit VERIFY_* env var, then .env, then demo default."""
+    return os.getenv(env_key) or _FILE_ENV.get(file_key) or default
+
+
+# Credentials come from .env (the same values the app was bootstrapped with),
+# so the checks always match the running stack. Override with VERIFY_* vars.
+ADMIN = (_cred("VERIFY_ADMIN_USERNAME", "ADMIN_USERNAME", "admin"),
+         _cred("VERIFY_ADMIN_PASSWORD", "ADMIN_PASSWORD", "DemoAdmin123!"))
+USER = (_cred("VERIFY_USER_USERNAME", "DEMO_USERNAME", "demo_user"),
+        _cred("VERIFY_USER_PASSWORD", "DEMO_PASSWORD", "DemoUser123!"))
 
 PASSED: list[str] = []
 FAILED: list[str] = []
@@ -103,8 +131,28 @@ def main() -> int:
 
     admin = Session()
     user = Session()
-    check("admin login succeeds", admin.login(*ADMIN))
-    check("regular user login succeeds", user.login(*USER))
+    if not admin.login(*ADMIN):
+        check("admin login succeeds", False, f"admin '{ADMIN[0]}' could not log in")
+        print(
+            "\n  Не удалось войти администратором. Проверьте ADMIN_USERNAME / "
+            "ADMIN_PASSWORD в .env\n"
+            "  и задайте те же значения через VERIFY_ADMIN_USERNAME / "
+            "VERIFY_ADMIN_PASSWORD, если они отличаются."
+        )
+        return report()
+    check("admin login succeeds", True)
+    if not user.login(*USER):
+        check("regular user login succeeds", False, f"user '{USER[0]}' could not log in")
+        print(
+            "\n  Регулярный пользователь не найден или пароль не совпадает.\n"
+            "  Скорее всего, демо-данные не созданы. Выполните:\n"
+            "      ./run.sh seed\n"
+            "  либо задайте свои учётные данные через VERIFY_USER_USERNAME / "
+            "VERIFY_USER_PASSWORD.\n"
+            "  Дальнейшие проверки зависят от этой учётной записи и пропущены."
+        )
+        return report()
+    check("regular user login succeeds", True)
 
     print("\n[3] Role enforcement on the server")
     forbidden_create = user.post(
@@ -152,9 +200,12 @@ def main() -> int:
     history = admin.get(f"/recurring-payments/{payment_id}/history").json()
     overdue_occ = next((o for o in history if o["due_date"] == due.isoformat()), None)
     check("overdue period exists", overdue_occ is not None)
-    check("overdue status is computed", bool(overdue_occ) and overdue_occ["status"] == "overdue",
-          overdue_occ and overdue_occ["status"])
-    check("overdue flag is set", bool(overdue_occ) and overdue_occ["is_overdue"] is True)
+    if overdue_occ is None:
+        print("  Период с ожидаемым сроком не найден — дальнейшие проверки пропущены.")
+        return report()
+    check("overdue status is computed", overdue_occ["status"] == "overdue",
+          overdue_occ["status"])
+    check("overdue flag is set", overdue_occ["is_overdue"] is True)
 
     future_periods = [o for o in history if o["due_date"] > today.isoformat()]
     check("future periods exist despite the overdue one", len(future_periods) >= 1)

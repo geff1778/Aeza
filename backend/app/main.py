@@ -19,6 +19,14 @@ DESCRIPTION = """
 
 
 def create_app() -> FastAPI:
+    # Fail fast with a readable message instead of serving with broken config.
+    # Problems are reported by name only — never with their values.
+    problems = settings.validate_runtime()
+    if problems:
+        raise RuntimeError(
+            "Invalid configuration: " + "; ".join(problems)
+        )
+
     app = FastAPI(
         title=settings.APP_NAME,
         description=DESCRIPTION,

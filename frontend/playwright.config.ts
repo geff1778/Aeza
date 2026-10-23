@@ -1,4 +1,26 @@
+import fs from 'node:fs'
+import path from 'node:path'
+
 import { defineConfig, devices } from '@playwright/test'
+
+/**
+ * Load the repo .env so E2E uses the same credentials the stack was
+ * bootstrapped with. Explicitly-set environment variables win.
+ */
+function loadRootEnv(): void {
+  const envPath = path.resolve(import.meta.dirname, '..', '.env')
+  if (!fs.existsSync(envPath)) return
+  for (const line of fs.readFileSync(envPath, 'utf8').split('\n')) {
+    const trimmed = line.trim()
+    if (!trimmed || trimmed.startsWith('#') || !trimmed.includes('=')) continue
+    const idx = trimmed.indexOf('=')
+    const key = trimmed.slice(0, idx).trim()
+    const value = trimmed.slice(idx + 1).trim()
+    if (!(key in process.env)) process.env[key] = value
+  }
+}
+
+loadRootEnv()
 
 /**
  * E2E runs against the real Docker Compose stack on :8080.

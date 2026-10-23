@@ -26,20 +26,30 @@ named **Aeza**.
 
 ## Commands
 
+`./run.sh` is the entry point: it creates `.env`, detects whether `sudo docker`
+is needed, waits for API health, and wraps every check.
+
 ```bash
-# stack
+./run.sh                # up --build -d + wait for health
+./run.sh seed           # synthetic demo data (idempotent)
+./run.sh verify         # 57 live HTTP checks against the running stack
+./run.sh test           # 104 backend tests (starts its own test DB)
+./run.sh e2e            # 42 Playwright tests (desktop + mobile)
+./run.sh check          # build + typecheck + lint
+./run.sh full           # seed + verify + test + check
+./run.sh creds          # demo credentials from .env
+./run.sh logs worker    # follow a service log
+./run.sh reset          # down -v (destroys data, asks for confirmation)
+```
+
+Raw equivalents, when the wrapper is not wanted:
+
+```bash
 docker compose up --build -d
-docker compose --profile demo run --rm seed     # synthetic demo data
-docker compose logs -f worker
-
-# backend
-cd backend && .venv/bin/python -m pytest         # 97 tests
-
-# frontend
+docker compose --profile demo run --rm seed
+cd backend && .venv/bin/python -m pytest
 cd frontend && npm run build && npm run typecheck && npm run lint
-cd frontend && npx playwright test               # 42 tests, desktop + mobile
-
-# live HTTP verification against a running stack
+cd frontend && npx playwright test
 backend/.venv/bin/python scripts/verify_stack.py
 ```
 
@@ -61,6 +71,11 @@ backend/.venv/bin/python scripts/verify_stack.py
   `e2e/helpers.ts`; a direct nav-link click fails on narrow viewports.
 - **Playwright artifacts (`frontend/test-results/`) contain demo passwords** and
   are gitignored. Do not commit them.
+- **`verify_stack.py` needs the demo user.** It logs in as `demo_user`; run
+  `./run.sh seed` first or it exits with a clear message telling you to.
+- **pytest needs its own PostgreSQL** on `TEST_DB_PORT` (default 55432) with user
+  `invoice`. `./run.sh test` starts it in a container; running `pytest` directly
+  requires it to exist already. Tests never touch the dev database.
 
 ## Demo credentials
 

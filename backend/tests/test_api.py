@@ -606,3 +606,93 @@ def test_occurrences_pagination_is_stable(user_api, admin_api, sample_payment_sp
     page1 = user_api.get("/api/v1/payment-occurrences", params={"limit": 3, "offset": 0}).json()["items"]
     page2 = user_api.get("/api/v1/payment-occurrences", params={"limit": 3, "offset": 3}).json()["items"]
     assert [i["id"] for i in page1 + page2] == [i["id"] for i in all_items[:6]]
+
+
+# ------------------------------------------------------- configuration validation
+
+
+def test_config_validation_rejects_short_secret_key():
+    """A weak SECRET_KEY must be reported as a fatal configuration problem."""
+    from app.config import Settings
+
+    s = Settings(
+        SECRET_KEY="short",
+        ADMIN_PASSWORD="StrongPassword123!",
+        _env_file=None,
+    )
+    problems = s.validate_runtime()
+    assert any("SECRET_KEY" in p for p in problems)
+
+
+def test_config_validation_rejects_missing_admin_password():
+    from app.config import Settings
+
+    s = Settings(
+        SECRET_KEY="a-sufficiently-long-secret-value",
+        ADMIN_PASSWORD="",
+        _env_file=None,
+    )
+    problems = s.validate_runtime()
+    assert any("ADMIN_PASSWORD" in p for p in problems)
+
+
+def test_config_validation_accepts_valid_settings():
+    from app.config import Settings
+
+    s = Settings(
+        SECRET_KEY="a-sufficiently-long-secret-value",
+        ADMIN_PASSWORD="StrongPassword123!",
+        _env_file=None,
+    )
+    assert s.validate_runtime() == []
+
+
+def test_config_validation_problems_never_contain_values():
+    """Error messages must name the variable without echoing its value."""
+    from app.config import Settings
+
+    secret = "leak-me-please-0123456789"
+    s = Settings(SECRET_KEY=secret, ADMIN_PASSWORD="x", _env_file=None)
+    for problem in s.validate_runtime():
+        assert secret not in problem
+
+
+def test_config_validation_production_requires_secure_cookie():
+    from app.config import Settings
+
+    s = Settings(
+        APP_ENV="production",
+        COOKIE_SECURE=False,
+        SECRET_KEY="a-sufficiently-long-secret-value",
+        ADMIN_PASSWORD="StrongPassword123!",
+        _env_file=None,
+    )
+    problems = s.validate_runtime()
+    assert any("COOKIE_SECURE" in p for p in problems)
+
+
+def test_config_validation_production_rejects_placeholder_secret():
+    from app.config import Settings
+
+    s = Settings(
+        APP_ENV="production",
+        COOKIE_SECURE=True,
+        SECRET_KEY="http://localhost-secret-key-value",
+        ADMIN_PASSWORD="StrongPassword123!",
+        _env_file=None,
+    )
+    problems = s.validate_runtime()
+    assert any("placeholder" in p for p in problems)
+
+
+def test_app_refuses_to_start_with_bad_config(monkeypatch):
+    """create_app() must fail fast instead of serving with broken config."""
+    import app.main as main_module
+    from app.config import Settings
+
+    bad = Settings(SECRET_KEY="short", ADMIN_PASSWORD="", _env_file=None)
+    monkeypatch.setattr(main_module, "settings", bad)
+    with pytest.raises(RuntimeError) as exc:
+        main_module.create_app()
+    assert "SECRET_KEY" in str(exc.value)
+    assert "short" not in str(exc.value)  # never echo the value

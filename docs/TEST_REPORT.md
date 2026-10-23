@@ -12,7 +12,7 @@
 
 | Проверка | Результат | Доказательство |
 |---|---|---|
-| Backend unit + API-тесты | **97 passed, 0 failed** | `cd backend && pytest -q` |
+| Backend unit + API-тесты | **104 passed, 0 failed** | `cd backend && pytest -q` |
 | Сборка frontend | **успешно** | `cd frontend && npm run build` |
 | Type checking | **успешно, 0 ошибок** | `cd frontend && npm run typecheck` |
 | Линтер frontend | **успешно, 0 ошибок и предупреждений** | `cd frontend && npm run lint` |
@@ -26,20 +26,20 @@
 
 ---
 
-## 2. Backend: 97 тестов
+## 2. Backend: 104 теста
 
 ```
 $ cd backend && .venv/bin/python -m pytest -q
 ........................................................................ [ 74%]
 .........................                                                [100%]
-97 passed in 20.13s
+104 passed in 21.74s
 ```
 
 Распределение по файлам:
 
 | Файл | Тестов | Что проверяет |
 |---|---|---|
-| `tests/test_api.py` | 45 | аутентификация, RBAC, CRUD, статусы, аудит, бюджеты, чеки, OpenAPI |
+| `tests/test_api.py` | 52 | аутентификация, RBAC, CRUD, статусы, аудит, бюджеты, чеки, OpenAPI |
 | `tests/test_notifications.py` | 20 | правила напоминаний, outbox, идемпотентность, повторные попытки, callback |
 | `tests/test_dates.py` | 13 | календарная арифметика, конец месяца, високосный год, горизонт |
 | `tests/test_payments_service.py` | 11 | генерация периодов, независимость, завершение, аудит |
@@ -76,6 +76,11 @@ $ cd backend && .venv/bin/python -m pytest -q
   ограничения загрузки файлов.
 - `test_occurrences_reject_unknown_sort_column` — имя колонки сортировки
   валидируется (защита от инъекции в ORDER BY).
+- `test_config_validation_*` — слабый `SECRET_KEY`, пустой `ADMIN_PASSWORD`,
+  production-требования (`COOKIE_SECURE`, placeholder-секрет) и валидные
+  настройки; сообщения об ошибках не содержат значений.
+- `test_app_refuses_to_start_with_bad_config` — `create_app()` падает с
+  `RuntimeError`, не выдавая значение секрета.
 
 ---
 
