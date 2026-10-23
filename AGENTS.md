@@ -33,7 +33,7 @@ is needed, waits for API health, and wraps every check.
 ./run.sh                # up --build -d + wait for health
 ./run.sh seed           # synthetic demo data (idempotent)
 ./run.sh verify         # 57 live HTTP checks against the running stack
-./run.sh test           # 104 backend tests (starts its own test DB)
+./run.sh test           # 106 backend tests (starts its own test DB)
 ./run.sh e2e            # 42 Playwright tests (desktop + mobile)
 ./run.sh check          # build + typecheck + lint
 ./run.sh full           # seed + verify + test + check

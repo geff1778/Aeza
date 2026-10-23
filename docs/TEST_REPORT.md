@@ -12,7 +12,7 @@
 
 | Проверка | Результат | Доказательство |
 |---|---|---|
-| Backend unit + API-тесты | **104 passed, 0 failed** | `cd backend && pytest -q` |
+| Backend unit + API-тесты | **106 passed, 0 failed** | `cd backend && pytest -q` |
 | Сборка frontend | **успешно** | `cd frontend && npm run build` |
 | Type checking | **успешно, 0 ошибок** | `cd frontend && npm run typecheck` |
 | Линтер frontend | **успешно, 0 ошибок и предупреждений** | `cd frontend && npm run lint` |
@@ -26,20 +26,20 @@
 
 ---
 
-## 2. Backend: 104 теста
+## 2. Backend: 106 тестов
 
 ```
 $ cd backend && .venv/bin/python -m pytest -q
 ........................................................................ [ 74%]
 .........................                                                [100%]
-104 passed in 21.74s
+106 passed in 21.18s
 ```
 
 Распределение по файлам:
 
 | Файл | Тестов | Что проверяет |
 |---|---|---|
-| `tests/test_api.py` | 52 | аутентификация, RBAC, CRUD, статусы, аудит, бюджеты, чеки, OpenAPI |
+| `tests/test_api.py` | 54 | аутентификация, RBAC, CRUD, статусы, аудит, бюджеты, чеки, OpenAPI |
 | `tests/test_notifications.py` | 20 | правила напоминаний, outbox, идемпотентность, повторные попытки, callback |
 | `tests/test_dates.py` | 13 | календарная арифметика, конец месяца, високосный год, горизонт |
 | `tests/test_payments_service.py` | 11 | генерация периодов, независимость, завершение, аудит |

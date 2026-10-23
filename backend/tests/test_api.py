@@ -696,3 +696,30 @@ def test_app_refuses_to_start_with_bad_config(monkeypatch):
         main_module.create_app()
     assert "SECRET_KEY" in str(exc.value)
     assert "short" not in str(exc.value)  # never echo the value
+
+
+def test_config_validation_production_rejects_placeholder_admin_password():
+    from app.config import Settings
+
+    s = Settings(
+        APP_ENV="production",
+        COOKIE_SECURE=True,
+        SECRET_KEY="a-sufficiently-long-secret-value",
+        ADMIN_PASSWORD="change-me-strong-password",
+        _env_file=None,
+    )
+    problems = s.validate_runtime()
+    assert any("ADMIN_PASSWORD" in p for p in problems)
+
+
+def test_config_validation_development_allows_placeholder_password():
+    """The demo default is fine for local development."""
+    from app.config import Settings
+
+    s = Settings(
+        APP_ENV="development",
+        SECRET_KEY="a-sufficiently-long-secret-value",
+        ADMIN_PASSWORD="change-me-strong-password",
+        _env_file=None,
+    )
+    assert s.validate_runtime() == []

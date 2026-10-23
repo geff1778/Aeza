@@ -30,7 +30,7 @@
 | `./run.sh` | поднять стек (сборка + миграции + bootstrap админа) |
 | `./run.sh seed` | демонстрационные данные (идемпотентно) |
 | `./run.sh verify` | проверить запущенный стек по HTTP (57 проверок) |
-| `./run.sh test` | backend-тесты (pytest, 104 теста) |
+| `./run.sh test` | backend-тесты (pytest, 106 тестов) |
 | `./run.sh e2e` | браузерные тесты (Playwright, 42 теста) |
 | `./run.sh check` | сборка, типы и линтер frontend |
 | `./run.sh full` | seed + verify + test + check |
@@ -346,7 +346,7 @@ curl -s http://localhost:8080/api/v1/openapi.json | head -c 200
 
 ```bash
 ./run.sh verify    # 57 проверок живого стека → "All stack checks passed."
-./run.sh test      # 104 backend-теста → "104 passed"
+./run.sh test      # 106 backend-тестов → "106 passed"
 ./run.sh check     # сборка + типы + линтер → без ошибок
 ./run.sh e2e       # 42 браузерных теста → "42 passed"
 ```
@@ -406,7 +406,7 @@ docker compose exec postgres psql -U invoice -d invoice \
 Самый простой путь — `run.sh`, он сам готовит окружение:
 
 ```bash
-./run.sh test     # 104 backend-теста (сам поднимает тестовую БД)
+./run.sh test     # 106 backend-тестов (сам поднимает тестовую БД)
 ./run.sh check    # сборка, типы и линтер frontend
 ./run.sh e2e      # 42 браузерных теста (нужен запущенный стек + ./run.sh seed)
 ./run.sh verify   # 57 проверок живого стека по HTTP
@@ -427,7 +427,7 @@ docker run -d --name ik-test-pg \
 cd backend
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt -r requirements-dev.txt
-pytest -q          # ожидается: 104 passed
+pytest -q          # ожидается: 106 passed
 ```
 
 Порт и база задаются в `backend/tests/conftest.py` (по умолчанию `55432`,

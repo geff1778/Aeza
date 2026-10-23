@@ -100,6 +100,11 @@ class Settings(BaseSettings):
                 problems.append("COOKIE_SECURE must be true in production")
             if "localhost" in self.SECRET_KEY:
                 problems.append("SECRET_KEY looks like a placeholder value")
+            if self.ADMIN_PASSWORD.lower().startswith("change-me"):
+                problems.append(
+                    "ADMIN_PASSWORD is still the placeholder from .env.example; "
+                    "set a real password in production"
+                )
         return problems
 
 
