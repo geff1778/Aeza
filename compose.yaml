@@ -1,0 +1,114 @@
+name: invoice-keeper
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: ik-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-invoice}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-invoice}
+      POSTGRES_DB: ${POSTGRES_DB:-invoice}
+    volumes:
+      # Named volume: data survives `docker compose down` and container rebuilds.
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-invoice} -d ${POSTGRES_DB:-invoice}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    networks: [ik-net]
+
+  api:
+    build:
+      context: ./backend
+    container_name: ik-api
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-invoice}:${POSTGRES_PASSWORD:-invoice}@postgres:5432/${POSTGRES_DB:-invoice}
+      UPLOAD_DIR: /data/uploads
+    volumes:
+      - uploads_data:/data/uploads
+    # Migrations and the admin bootstrap run before the server accepts traffic,
+    # so the API never serves requests against an un-migrated schema.
+    command: >
+      sh -c "alembic upgrade head &&
+             python scripts/bootstrap.py &&
+             uvicorn app.main:app --host 0.0.0.0 --port 8000 --proxy-headers"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8000/api/v1/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
+    networks: [ik-net]
+
+  worker:
+    build:
+      context: ./backend
+    container_name: ik-worker
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-invoice}:${POSTGRES_PASSWORD:-invoice}@postgres:5432/${POSTGRES_DB:-invoice}
+      UPLOAD_DIR: /data/uploads
+    volumes:
+      - uploads_data:/data/uploads
+    # A single dedicated worker process owns period generation and notifications.
+    # It never runs inside the API container, so no duplicate schedulers exist.
+    command: >
+      sh -c "alembic upgrade head &&
+             python -m app.worker.main"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+    networks: [ik-net]
+
+  frontend:
+    build:
+      context: ./frontend
+    container_name: ik-frontend
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "${APP_PORT:-8080}:80"
+    networks: [ik-net]
+
+  # Demo data is opt-in: it only runs when explicitly requested, so synthetic
+  # records never appear in a real deployment by accident.
+  #   docker compose run --rm seed
+  seed:
+    build:
+      context: ./backend
+    profiles: ["demo"]
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-invoice}:${POSTGRES_PASSWORD:-invoice}@postgres:5432/${POSTGRES_DB:-invoice}
+      UPLOAD_DIR: /data/uploads
+    command: python scripts/seed_demo.py
+    depends_on:
+      postgres:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+    networks: [ik-net]
+
+volumes:
+  postgres_data:
+  uploads_data:
+
+networks:
+  ik-net:
+    driver: bridge

@@ -1,0 +1,2241 @@
+openapi: 3.1.0
+info:
+  title: Invoice Keeper
+  description: '
+
+    **Invoice Keeper** — учёт регулярных платежей: сроки, фактическая оплата,
+
+    просрочки, общая история для всех пользователей, Telegram-уведомления,
+
+    бюджеты и журнал аудита.
+
+    '
+  version: 1.0.0
+paths:
+  /api/v1/health:
+    get:
+      tags:
+      - system
+      summary: Health
+      description: Liveness/readiness probe. Never reveals credentials or internals.
+      operationId: health_api_v1_health_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthOut'
+  /api/v1/integrations:
+    get:
+      tags:
+      - system
+      summary: Integrations
+      operationId: integrations_api_v1_integrations_get
+      parameters:
+      - name: invoice_session
+        in: cookie
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Invoice Session
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IntegrationStatus'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/auth/login:
+    post:
+      tags:
+      - auth
+      summary: Login
+      operationId: login_api_v1_auth_login_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MeOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/auth/me:
+    get:
+      tags:
+      - auth
+      summary: Me
+      operationId: me_api_v1_auth_me_get
+      parameters:
+      - name: invoice_session_csrf
+        in: cookie
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Invoice Session Csrf
+      - name: invoice_session
+        in: cookie
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Invoice Session
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MeOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/auth/logout:
+    post:
+      tags:
+      - auth
+      summary: Logout
+      operationId: logout_api_v1_auth_logout_post
+      parameters:
+      - name: X-CSRF-Token
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Csrf-Token
+      - name: invoice_session_csrf
+        in: cookie
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Invoice Session Csrf
+      - name: invoice_session
+        in: cookie
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Invoice Session
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                title: Response Logout Api V1 Auth Logout Post
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/recurring-payments:
+    get:
+      tags:
+      - recurring-payments
+      summary: List Recurring Payments
+      operationId: list_recurring_payments_api_v1_recurring_payments_get
+      parameters:
+      - name: include_inactive
+        in: query
+        required: false
+        schema:
+          type: boolean
+          default: true
+          title: Include Inactive
+      - name: currency
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - $ref: '#/components/schemas/Currency'
+          - type: 'null'
+          title: Currency
+      - name: search
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Search
+      - name: invoice_session
+        in: cookie
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Invoice Session
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/RecurringPaymentOut'
+                title: Response List Recurring Payments Api V1 Recurring Payments
+                  Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    post:
+      tags:
+      - recurring-payments
+      summary: Create Recurring Payment
+      operationId: create_recurring_payment_api_v1_recurring_payments_post
+      parameters:
+      - name: X-CSRF-Token
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Csrf-Token
+      - name: invoice_session
+        in: cookie
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Invoice Session
+      - name: invoice_session_csrf
+        in: cookie
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Invoice Session Csrf
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RecurringPaymentCreate'
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecurringPaymentOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/recurring-payments/{payment_id}:
+    get:
+      tags:
+      - recurring-payments
+      summary: Get Recurring Payment
+      operationId: get_recurring_payment_api_v1_recurring_payments__payment_id__get
+      parameters:
+      - name: payment_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          title: Payment Id
+      - name: invoice_session
+        in: cookie
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Invoice Session
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecurringPaymentOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    patch:
+      tags:
+      - recurring-payments
+      summary: Update Recurring Payment
+      operationId: update_recurring_payment_api_v1_recurring_payments__payment_id__patch
+      parameters:
+      - name: payment_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          title: Payment Id
+      - name: X-CSRF-Token
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Csrf-Token
+      - name: invoice_session
+        in: cookie
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Invoice Session
+      - name: invoice_session_csrf
+        in: cookie
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Invoice Session Csrf
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RecurringPaymentUpdate'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecurringPaymentOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    delete:
+      tags:
+      - recurring-payments
+      summary: Complete Recurring Payment
+      description: 'Soft-complete: stops generation and reminders, keeps the full
+        history.'
+      operationId: complete_recurring_payment_api_v1_recurring_payments__payment_id__delete
+      parameters:
+      - name: payment_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          title: Payment Id
+      - name: X-CSRF-Token
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Csrf-Token
+      - name: invoice_session
+        in: cookie
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Invoice Session
+      - name: invoice_session_csrf
+        in: cookie
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Invoice Session Csrf
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecurringPaymentOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/recurring-payments/{payment_id}/history:
+    get:
+      tags:
+      - recurring-payments
+      summary: Get History
+      operationId: get_history_api_v1_recurring_payments__payment_id__history_get
+      parameters:
+      - name: payment_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          title: Payment Id
+      - name: invoice_session
+        in: cookie
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Invoice Session
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/OccurrenceOut'
+                title: Response Get History Api V1 Recurring Payments  Payment Id  History
+                  Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/payment-occurrences:
+    get:
+      tags:
+      - payment-occurrences
+      summary: List Occurrences
+      operationId: list_occurrences_api_v1_payment_occurrences_get
+      parameters:
+      - name: status
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Status
+      - name: currency
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - $ref: '#/components/schemas/Currency'
+          - type: 'null'
+          title: Currency
+      - name: recurring_payment_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Recurring Payment Id
+      - name: date_from
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+          title: Date From
+      - name: date_to
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+          title: Date To
+      - name: search
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Search
+      - name: sort
+        in: query
+        required: false
+        schema:
+          type: string
+          pattern: ^(due_date|amount|created_at)$
+          default: due_date
+          title: Sort
+      - name: direction
+        in: query
+        required: false
+        schema:
+          type: string
+          pattern: ^(asc|desc)$
+          default: asc
+          title: Direction
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 500
+          minimum: 1
+          default: 100
+          title: Limit
+      - name: offset
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 0
+          default: 0
+          title: Offset
+      - name: invoice_session
+        in: cookie
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Invoice Session
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OccurrenceListOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/payment-occurrences/{occurrence_id}:
+    get:
+      tags:
+      - payment-occurrences
+      summary: Get Occurrence
+      operationId: get_occurrence_api_v1_payment_occurrences__occurrence_id__get
+      parameters:
+      - name: occurrence_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          title: Occurrence Id
+      - name: invoice_session
+        in: cookie
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Invoice Session
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OccurrenceOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    patch:
+      tags:
+      - payment-occurrences
+      summary: Update Occurrence
+      description: 'Mark paid, correct the actual payment date, or clear a mistaken
+        mark.
+
+
+        Available to every authenticated user because the payment status is shared.'
+      operationId: update_occurrence_api_v1_payment_occurrences__occurrence_id__patch
+      parameters:
+      - name: occurrence_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          title: Occurrence Id
+      - name: X-CSRF-Token
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Csrf-Token
+      - name: invoice_session
+        in: cookie
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Invoice Session
+      - name: invoice_session_csrf
+        in: cookie
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Invoice Session Csrf
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OccurrenceUpdate'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OccurrenceOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/payments/summary:
+    get:
+      tags:
+      - analytics
+      summary: Payments Summary
+      operationId: payments_summary_api_v1_payments_summary_get
+      parameters:
+      - name: invoice_session
+        in: cookie
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Invoice Session
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SummaryOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/dashboard:
+    get:
+      tags:
+      - analytics
+      summary: Dashboard
+      operationId: dashboard_api_v1_dashboard_get
+      parameters:
+      - name: invoice_session
+        in: cookie
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Invoice Session
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DashboardOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/calendar:
+    get:
+      tags:
+      - analytics
+      summary: Calendar
+      operationId: calendar_api_v1_calendar_get
+      parameters:
+      - name: month
+        in: query
+        required: true
+        schema:
+          type: string
+          description: Формат YYYY-MM
+          title: Month
+        description: Формат YYYY-MM
+      - name: currency
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - $ref: '#/components/schemas/Currency'
+          - type: 'null'
+          title: Currency
+      - name: status
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Status
+      - name: invoice_session
+        in: cookie
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Invoice Session
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CalendarOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/users:
+    get:
+      tags:
+      - users
+      summary: List Users
+      operationId: list_users_api_v1_users_get
+      parameters:
+      - name: invoice_session
+        in: cookie
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Invoice Session
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/UserOut'
+                title: Response List Users Api V1 Users Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    post:
+      tags:
+      - users
+      summary: Create User
+      operationId: create_user_api_v1_users_post
+      parameters:
+      - name: X-CSRF-Token
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Csrf-Token
+      - name: invoice_session
+        in: cookie
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Invoice Session
+      - name: invoice_session_csrf
+        in: cookie
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Invoice Session Csrf
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserCreate'
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/users/{user_id}:
+    patch:
+      tags:
+      - users
+      summary: Update User
+      operationId: update_user_api_v1_users__user_id__patch
+      parameters:
+      - name: user_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          title: User Id
+      - name: X-CSRF-Token
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Csrf-Token
+      - name: invoice_session
+        in: cookie
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Invoice Session
+      - name: invoice_session_csrf
+        in: cookie
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Invoice Session Csrf
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserUpdate'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    delete:
+      tags:
+      - users
+      summary: Deactivate User
+      description: Deactivate rather than hard-delete so audit history stays intact.
+      operationId: deactivate_user_api_v1_users__user_id__delete
+      parameters:
+      - name: user_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          title: User Id
+      - name: X-CSRF-Token
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Csrf-Token
+      - name: invoice_session
+        in: cookie
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Invoice Session
+      - name: invoice_session_csrf
+        in: cookie
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Invoice Session Csrf
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/budgets:
+    get:
+      tags:
+      - budgets
+      summary: List Budgets
+      operationId: list_budgets_api_v1_budgets_get
+      parameters:
+      - name: period_type
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - $ref: '#/components/schemas/BudgetPeriod'
+          - type: 'null'
+          title: Period Type
+      - name: period_key
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Period Key
+      - name: invoice_session
+        in: cookie
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Invoice Session
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/BudgetOut'
+                title: Response List Budgets Api V1 Budgets Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    put:
+      tags:
+      - budgets
+      summary: Upsert Budget
+      operationId: upsert_budget_api_v1_budgets_put
+      parameters:
+      - name: X-CSRF-Token
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Csrf-Token
+      - name: invoice_session
+        in: cookie
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Invoice Session
+      - name: invoice_session_csrf
+        in: cookie
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Invoice Session Csrf
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BudgetUpsert'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BudgetOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/budgets/{budget_id}:
+    delete:
+      tags:
+      - budgets
+      summary: Delete Budget
+      operationId: delete_budget_api_v1_budgets__budget_id__delete
+      parameters:
+      - name: budget_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          title: Budget Id
+      - name: X-CSRF-Token
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Csrf-Token
+      - name: invoice_session
+        in: cookie
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Invoice Session
+      - name: invoice_session_csrf
+        in: cookie
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Invoice Session Csrf
+      responses:
+        '204':
+          description: Successful Response
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/audit:
+    get:
+      tags:
+      - admin
+      summary: List Audit
+      operationId: list_audit_api_v1_audit_get
+      parameters:
+      - name: action
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Action
+      - name: user_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: User Id
+      - name: date_from
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+          title: Date From
+      - name: date_to
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+          title: Date To
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 500
+          minimum: 1
+          default: 100
+          title: Limit
+      - name: offset
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 0
+          default: 0
+          title: Offset
+      - name: invoice_session
+        in: cookie
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Invoice Session
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditListOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/notifications:
+    get:
+      tags:
+      - admin
+      summary: List Notifications
+      operationId: list_notifications_api_v1_notifications_get
+      parameters:
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 500
+          minimum: 1
+          default: 100
+          title: Limit
+      - name: invoice_session
+        in: cookie
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Invoice Session
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/NotificationLogOut'
+                title: Response List Notifications Api V1 Notifications Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/attachments/occurrence/{occurrence_id}:
+    get:
+      tags:
+      - attachments
+      summary: List Attachments
+      operationId: list_attachments_api_v1_attachments_occurrence__occurrence_id__get
+      parameters:
+      - name: occurrence_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          title: Occurrence Id
+      - name: invoice_session
+        in: cookie
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Invoice Session
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AttachmentOut'
+                title: Response List Attachments Api V1 Attachments Occurrence  Occurrence
+                  Id  Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    post:
+      tags:
+      - attachments
+      summary: Upload Attachment
+      operationId: upload_attachment_api_v1_attachments_occurrence__occurrence_id__post
+      parameters:
+      - name: occurrence_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          title: Occurrence Id
+      - name: X-CSRF-Token
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Csrf-Token
+      - name: invoice_session
+        in: cookie
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Invoice Session
+      - name: invoice_session_csrf
+        in: cookie
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Invoice Session Csrf
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Body_upload_attachment_api_v1_attachments_occurrence__occurrence_id__post'
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AttachmentOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/attachments/{attachment_id}/download:
+    get:
+      tags:
+      - attachments
+      summary: Download Attachment
+      operationId: download_attachment_api_v1_attachments__attachment_id__download_get
+      parameters:
+      - name: attachment_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          title: Attachment Id
+      - name: invoice_session
+        in: cookie
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Invoice Session
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/attachments/{attachment_id}:
+    delete:
+      tags:
+      - attachments
+      summary: Delete Attachment
+      operationId: delete_attachment_api_v1_attachments__attachment_id__delete
+      parameters:
+      - name: attachment_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          title: Attachment Id
+      - name: X-CSRF-Token
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Csrf-Token
+      - name: invoice_session
+        in: cookie
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Invoice Session
+      - name: invoice_session_csrf
+        in: cookie
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Invoice Session Csrf
+      responses:
+        '204':
+          description: Successful Response
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+components:
+  schemas:
+    AttachmentOut:
+      properties:
+        id:
+          type: integer
+          title: Id
+        occurrence_id:
+          type: integer
+          title: Occurrence Id
+        original_name:
+          type: string
+          title: Original Name
+        content_type:
+          type: string
+          title: Content Type
+        size_bytes:
+          type: integer
+          title: Size Bytes
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+      type: object
+      required:
+      - id
+      - occurrence_id
+      - original_name
+      - content_type
+      - size_bytes
+      - created_at
+      title: AttachmentOut
+    AuditListOut:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/AuditOut'
+          type: array
+          title: Items
+        total:
+          type: integer
+          title: Total
+      type: object
+      required:
+      - items
+      - total
+      title: AuditListOut
+    AuditOut:
+      properties:
+        id:
+          type: integer
+          title: Id
+        actor_label:
+          type: string
+          title: Actor Label
+        action:
+          type: string
+          title: Action
+        entity_type:
+          type: string
+          title: Entity Type
+        entity_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Entity Id
+        description:
+          type: string
+          title: Description
+        changes:
+          anyOf:
+          - type: object
+          - type: 'null'
+          title: Changes
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+      type: object
+      required:
+      - id
+      - actor_label
+      - action
+      - entity_type
+      - entity_id
+      - description
+      - changes
+      - created_at
+      title: AuditOut
+    Body_upload_attachment_api_v1_attachments_occurrence__occurrence_id__post:
+      properties:
+        file:
+          type: string
+          format: binary
+          title: File
+      type: object
+      required:
+      - file
+      title: Body_upload_attachment_api_v1_attachments_occurrence__occurrence_id__post
+    BudgetOut:
+      properties:
+        id:
+          type: integer
+          title: Id
+        period_type:
+          $ref: '#/components/schemas/BudgetPeriod'
+        period_key:
+          type: string
+          title: Period Key
+        currency:
+          $ref: '#/components/schemas/Currency'
+        limit_amount:
+          type: string
+          title: Limit Amount
+        planned_amount:
+          type: string
+          title: Planned Amount
+        actual_amount:
+          type: string
+          title: Actual Amount
+        remaining:
+          type: string
+          title: Remaining
+        usage_percent:
+          type: number
+          title: Usage Percent
+        over_limit:
+          type: boolean
+          title: Over Limit
+      type: object
+      required:
+      - id
+      - period_type
+      - period_key
+      - currency
+      - limit_amount
+      - planned_amount
+      - actual_amount
+      - remaining
+      - usage_percent
+      - over_limit
+      title: BudgetOut
+    BudgetPeriod:
+      type: string
+      enum:
+      - month
+      - year
+      title: BudgetPeriod
+    BudgetUpsert:
+      properties:
+        period_type:
+          $ref: '#/components/schemas/BudgetPeriod'
+        period_key:
+          type: string
+          maxLength: 10
+          minLength: 4
+          title: Period Key
+        currency:
+          $ref: '#/components/schemas/Currency'
+        limit_amount:
+          anyOf:
+          - type: number
+            minimum: 0.0
+          - type: string
+          title: Limit Amount
+      type: object
+      required:
+      - period_type
+      - period_key
+      - currency
+      - limit_amount
+      title: BudgetUpsert
+    CalendarDay:
+      properties:
+        date:
+          type: string
+          format: date
+          title: Date
+        items:
+          items:
+            $ref: '#/components/schemas/OccurrenceOut'
+          type: array
+          title: Items
+      type: object
+      required:
+      - date
+      - items
+      title: CalendarDay
+    CalendarOut:
+      properties:
+        month:
+          type: string
+          title: Month
+        days:
+          items:
+            $ref: '#/components/schemas/CalendarDay'
+          type: array
+          title: Days
+      type: object
+      required:
+      - month
+      - days
+      title: CalendarOut
+    Currency:
+      type: string
+      enum:
+      - RUB
+      - USD
+      - EUR
+      title: Currency
+    CurrencyTotals:
+      properties:
+        currency:
+          $ref: '#/components/schemas/Currency'
+        upcoming:
+          type: string
+          title: Upcoming
+        overdue:
+          type: string
+          title: Overdue
+        paid:
+          type: string
+          title: Paid
+      type: object
+      required:
+      - currency
+      - upcoming
+      - overdue
+      - paid
+      title: CurrencyTotals
+    DashboardOut:
+      properties:
+        today:
+          type: string
+          format: date
+          title: Today
+        timezone:
+          type: string
+          title: Timezone
+        totals:
+          items:
+            $ref: '#/components/schemas/CurrencyTotals'
+          type: array
+          title: Totals
+        due_soon_count:
+          type: integer
+          title: Due Soon Count
+        overdue_count:
+          type: integer
+          title: Overdue Count
+        paid_count:
+          type: integer
+          title: Paid Count
+        upcoming:
+          items:
+            $ref: '#/components/schemas/OccurrenceOut'
+          type: array
+          title: Upcoming
+        recent_activity:
+          items:
+            $ref: '#/components/schemas/AuditOut'
+          type: array
+          title: Recent Activity
+        integrations:
+          type: object
+          title: Integrations
+      type: object
+      required:
+      - today
+      - timezone
+      - totals
+      - due_soon_count
+      - overdue_count
+      - paid_count
+      - upcoming
+      - recent_activity
+      - integrations
+      title: DashboardOut
+    HTTPValidationError:
+      properties:
+        detail:
+          items:
+            $ref: '#/components/schemas/ValidationError'
+          type: array
+          title: Detail
+      type: object
+      title: HTTPValidationError
+    HealthOut:
+      properties:
+        status:
+          type: string
+          title: Status
+        database:
+          type: string
+          title: Database
+        timezone:
+          type: string
+          title: Timezone
+        version:
+          type: string
+          title: Version
+      type: object
+      required:
+      - status
+      - database
+      - timezone
+      - version
+      title: HealthOut
+    IntegrationStatus:
+      properties:
+        telegram_configured:
+          type: boolean
+          title: Telegram Configured
+        telegram_hint:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Telegram Hint
+        smtp_configured:
+          type: boolean
+          title: Smtp Configured
+        smtp_hint:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Smtp Hint
+      type: object
+      required:
+      - telegram_configured
+      - smtp_configured
+      title: IntegrationStatus
+    LoginRequest:
+      properties:
+        username:
+          type: string
+          maxLength: 64
+          minLength: 1
+          title: Username
+        password:
+          type: string
+          maxLength: 256
+          minLength: 1
+          title: Password
+      type: object
+      required:
+      - username
+      - password
+      title: LoginRequest
+    MeOut:
+      properties:
+        id:
+          type: integer
+          title: Id
+        username:
+          type: string
+          title: Username
+        email:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Email
+        role:
+          $ref: '#/components/schemas/Role'
+        is_active:
+          type: boolean
+          title: Is Active
+        is_bootstrap:
+          type: boolean
+          title: Is Bootstrap
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+        csrf_token:
+          type: string
+          title: Csrf Token
+      type: object
+      required:
+      - id
+      - username
+      - email
+      - role
+      - is_active
+      - is_bootstrap
+      - created_at
+      - csrf_token
+      title: MeOut
+    NotificationChannel:
+      type: string
+      enum:
+      - telegram
+      - email
+      title: NotificationChannel
+    NotificationLogOut:
+      properties:
+        id:
+          type: integer
+          title: Id
+        occurrence_id:
+          type: integer
+          title: Occurrence Id
+        channel:
+          $ref: '#/components/schemas/NotificationChannel'
+        kind:
+          type: string
+          title: Kind
+        status:
+          type: string
+          title: Status
+        attempts:
+          type: integer
+          title: Attempts
+        last_error:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Last Error
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+        sent_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Sent At
+      type: object
+      required:
+      - id
+      - occurrence_id
+      - channel
+      - kind
+      - status
+      - attempts
+      - last_error
+      - created_at
+      - sent_at
+      title: NotificationLogOut
+    OccurrenceListOut:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/OccurrenceOut'
+          type: array
+          title: Items
+        total:
+          type: integer
+          title: Total
+      type: object
+      required:
+      - items
+      - total
+      title: OccurrenceListOut
+    OccurrenceOut:
+      properties:
+        id:
+          type: integer
+          title: Id
+        recurring_payment_id:
+          type: integer
+          title: Recurring Payment Id
+        due_date:
+          type: string
+          format: date
+          title: Due Date
+        amount:
+          type: string
+          title: Amount
+        currency:
+          $ref: '#/components/schemas/Currency'
+        is_paid:
+          type: boolean
+          title: Is Paid
+        paid_at:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+          title: Paid At
+        receipt_url:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Receipt Url
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+        updated_at:
+          type: string
+          format: date-time
+          title: Updated At
+        status:
+          type: string
+          title: Status
+        status_label:
+          type: string
+          title: Status Label
+        days_until_due:
+          type: integer
+          title: Days Until Due
+        is_overdue:
+          type: boolean
+          title: Is Overdue
+        payment_title:
+          type: string
+          title: Payment Title
+          default: ''
+        recurrence:
+          $ref: '#/components/schemas/Recurrence'
+          default: monthly
+        attachment_count:
+          type: integer
+          title: Attachment Count
+          default: 0
+      type: object
+      required:
+      - id
+      - recurring_payment_id
+      - due_date
+      - amount
+      - currency
+      - is_paid
+      - paid_at
+      - receipt_url
+      - created_at
+      - updated_at
+      - status
+      - status_label
+      - days_until_due
+      - is_overdue
+      title: OccurrenceOut
+    OccurrenceUpdate:
+      properties:
+        is_paid:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Is Paid
+        paid_at:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+          title: Paid At
+        receipt_url:
+          anyOf:
+          - type: string
+            maxLength: 1000
+          - type: 'null'
+          title: Receipt Url
+      type: object
+      title: OccurrenceUpdate
+    Recurrence:
+      type: string
+      enum:
+      - monthly
+      - quarterly
+      - yearly
+      title: Recurrence
+    RecurringPaymentCreate:
+      properties:
+        title:
+          type: string
+          maxLength: 200
+          minLength: 1
+          title: Title
+        description:
+          anyOf:
+          - type: string
+            maxLength: 2000
+          - type: 'null'
+          title: Description
+        amount:
+          anyOf:
+          - type: number
+            exclusiveMinimum: 0.0
+          - type: string
+          title: Amount
+        currency:
+          $ref: '#/components/schemas/Currency'
+        first_due_date:
+          type: string
+          format: date
+          title: First Due Date
+        recurrence:
+          $ref: '#/components/schemas/Recurrence'
+          default: monthly
+        anchor_day:
+          anyOf:
+          - type: integer
+            maximum: 31.0
+            minimum: 1.0
+          - type: 'null'
+          title: Anchor Day
+      type: object
+      required:
+      - title
+      - amount
+      - currency
+      - first_due_date
+      title: RecurringPaymentCreate
+    RecurringPaymentOut:
+      properties:
+        id:
+          type: integer
+          title: Id
+        title:
+          type: string
+          title: Title
+        description:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Description
+        amount:
+          type: string
+          title: Amount
+        currency:
+          $ref: '#/components/schemas/Currency'
+        recurrence:
+          $ref: '#/components/schemas/Recurrence'
+        anchor_day:
+          type: integer
+          title: Anchor Day
+        first_due_date:
+          type: string
+          format: date
+          title: First Due Date
+        is_active:
+          type: boolean
+          title: Is Active
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+        updated_at:
+          type: string
+          format: date-time
+          title: Updated At
+        occurrences_count:
+          type: integer
+          title: Occurrences Count
+          default: 0
+        unpaid_count:
+          type: integer
+          title: Unpaid Count
+          default: 0
+        overdue_count:
+          type: integer
+          title: Overdue Count
+          default: 0
+      type: object
+      required:
+      - id
+      - title
+      - description
+      - amount
+      - currency
+      - recurrence
+      - anchor_day
+      - first_due_date
+      - is_active
+      - created_at
+      - updated_at
+      title: RecurringPaymentOut
+    RecurringPaymentUpdate:
+      properties:
+        title:
+          anyOf:
+          - type: string
+            maxLength: 200
+            minLength: 1
+          - type: 'null'
+          title: Title
+        description:
+          anyOf:
+          - type: string
+            maxLength: 2000
+          - type: 'null'
+          title: Description
+        amount:
+          anyOf:
+          - type: number
+            exclusiveMinimum: 0.0
+          - type: string
+          - type: 'null'
+          title: Amount
+        currency:
+          anyOf:
+          - $ref: '#/components/schemas/Currency'
+          - type: 'null'
+        first_due_date:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+          title: First Due Date
+        recurrence:
+          anyOf:
+          - $ref: '#/components/schemas/Recurrence'
+          - type: 'null'
+        anchor_day:
+          anyOf:
+          - type: integer
+            maximum: 31.0
+            minimum: 1.0
+          - type: 'null'
+          title: Anchor Day
+        is_active:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Is Active
+      type: object
+      title: RecurringPaymentUpdate
+    Role:
+      type: string
+      enum:
+      - admin
+      - user
+      title: Role
+    SummaryOut:
+      properties:
+        today:
+          type: string
+          format: date
+          title: Today
+        timezone:
+          type: string
+          title: Timezone
+        by_currency:
+          items:
+            $ref: '#/components/schemas/CurrencyTotals'
+          type: array
+          title: By Currency
+        by_month:
+          items:
+            type: object
+          type: array
+          title: By Month
+        status_counts:
+          type: object
+          title: Status Counts
+        overdue_count:
+          type: integer
+          title: Overdue Count
+      type: object
+      required:
+      - today
+      - timezone
+      - by_currency
+      - by_month
+      - status_counts
+      - overdue_count
+      title: SummaryOut
+    UserCreate:
+      properties:
+        username:
+          type: string
+          maxLength: 64
+          minLength: 3
+          title: Username
+        password:
+          type: string
+          maxLength: 256
+          minLength: 8
+          title: Password
+        email:
+          anyOf:
+          - type: string
+            format: email
+          - type: 'null'
+          title: Email
+        role:
+          $ref: '#/components/schemas/Role'
+          default: user
+      type: object
+      required:
+      - username
+      - password
+      title: UserCreate
+    UserOut:
+      properties:
+        id:
+          type: integer
+          title: Id
+        username:
+          type: string
+          title: Username
+        email:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Email
+        role:
+          $ref: '#/components/schemas/Role'
+        is_active:
+          type: boolean
+          title: Is Active
+        is_bootstrap:
+          type: boolean
+          title: Is Bootstrap
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+      type: object
+      required:
+      - id
+      - username
+      - email
+      - role
+      - is_active
+      - is_bootstrap
+      - created_at
+      title: UserOut
+    UserUpdate:
+      properties:
+        password:
+          anyOf:
+          - type: string
+            maxLength: 256
+            minLength: 8
+          - type: 'null'
+          title: Password
+        email:
+          anyOf:
+          - type: string
+            format: email
+          - type: 'null'
+          title: Email
+        role:
+          anyOf:
+          - $ref: '#/components/schemas/Role'
+          - type: 'null'
+        is_active:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Is Active
+      type: object
+      title: UserUpdate
+    ValidationError:
+      properties:
+        loc:
+          items:
+            anyOf:
+            - type: string
+            - type: integer
+          type: array
+          title: Location
+        msg:
+          type: string
+          title: Message
+        type:
+          type: string
+          title: Error Type
+      type: object
+      required:
+      - loc
+      - msg
+      - type
+      title: ValidationError
