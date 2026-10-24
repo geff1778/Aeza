@@ -1,6 +1,10 @@
 import hashlib
+import io
+import os
 import secrets
 import sqlite3
+import subprocess
+import sys
 import tempfile
 import time
 import unittest
@@ -19,6 +23,8 @@ from backend.auth.tokens import TokenSigner, base64url
 from backend.config import Settings
 from backend.database import UserRepository
 from backend.main import create_app
+
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 
 class AuthenticationTests(unittest.TestCase):
@@ -185,7 +191,9 @@ class AuthenticationTests(unittest.TestCase):
         with patch.object(self.auth.codes, "clock", return_value=time.monotonic() + 120):
             self.assertEqual(self.exchange(code).json()["error"], "invalid_grant")
         token = self.login().json()["access_token"]
-        with patch.object(self.auth.sessions, "clock", return_value=time.monotonic() + self.settings.session_ttl + 1):
+        # Sessions are persisted with a wall-clock expiry, so the test advances
+        # the store's clock with time.time(), not the monotonic clock.
+        with patch.object(self.auth.sessions, "clock", return_value=time.time() + self.settings.session_ttl + 1):
             self.assertEqual(self.client.get("/auth/me", headers={"Authorization": f"Bearer {token}"}).status_code, 401)
 
     def test_tampered_expired_and_id_tokens_cannot_authenticate(self):
@@ -265,6 +273,43 @@ class CacheTests(unittest.TestCase):
         cache.put("other", "new", 10)
         self.assertEqual(cache.pop("other"), "new")
         self.assertIsNone(cache.pop("other"))
+
+
+class UserCliTests(unittest.TestCase):
+    """The provisioning command must work without an interactive terminal.
+
+    ``docker compose exec`` has no TTY, and ``getpass`` blocks forever there, so
+    the documented command used to leave an empty auth database and every login
+    answered "Invalid login or password". These tests pin the stdin fallback.
+    """
+
+    def test_password_is_read_from_stdin_without_a_tty(self):
+        from backend.users import read_password
+
+        with patch("sys.stdin", io.StringIO("twelve-chars-ok\ntwelve-chars-ok\n")):
+            self.assertEqual(read_password(), "twelve-chars-ok")
+
+    def test_mismatched_passwords_are_rejected(self):
+        from backend.users import read_password
+
+        with patch("sys.stdin", io.StringIO("twelve-chars-ok\nsomething-else\n")):
+            with self.assertRaises(ValueError):
+                read_password()
+
+    def test_create_command_provisions_a_login_non_interactively(self):
+        with tempfile.TemporaryDirectory() as directory:
+            environment = {**os.environ,
+                "AUTH_DATABASE": str(Path(directory) / "auth.sqlite3"),
+                "AUTH_PRIVATE_KEY": str(Path(directory) / "private_key.pem")}
+            result = subprocess.run(
+                [sys.executable, "-m", "backend.users", "create", "cli@aeza.test"],
+                input="twelve-chars-ok\ntwelve-chars-ok\n", capture_output=True, text=True,
+                cwd=PROJECT_ROOT, env=environment, timeout=120,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("cli@aeza.test", result.stdout)
+            users = UserRepository(Path(directory) / "auth.sqlite3")
+            self.assertIsNotNone(users.credentials("cli@aeza.test"))
 
 
 if __name__ == "__main__":

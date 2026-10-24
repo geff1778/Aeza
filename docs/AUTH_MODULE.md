@@ -18,7 +18,7 @@ Python 3.12+. Из корня проекта в PowerShell:
 .\.venv\Scripts\python.exe -m uvicorn backend.main:app --host 127.0.0.1 --port 8000 --workers 1
 ```
 
-Команда создания пользователя запросит пароль дважды; минимум 12 символов. База `db/auth.sqlite3` и таблицы `users` и `auth_sessions` создаются автоматически из `db/schema.sql`. Для создания пустой базы: `python -m backend.users init`. В Docker Compose используйте `docker compose exec api python -m backend.users create <login>`; SQLite и RSA-ключ хранятся в томе `auth_data`. Администратор не создаётся автоматически, пароль в Compose не задаётся.
+Команда создания пользователя запросит пароль дважды; минимум 12 символов. База `db/auth.sqlite3` и таблицы `users` и `auth_sessions` создаются автоматически из `db/schema.sql`. Для создания пустой базы: `python -m backend.users init`. В Docker Compose используйте `docker compose exec api python -m backend.users create <login>`; SQLite и RSA-ключ хранятся в томе `auth_data`. Администратор не создаётся автоматически, пароль в Compose не задаётся. Без интерактивного терминала (`docker compose exec -T`) пароль читается из stdin — `getpass` в контейнере без TTY ждёт ввода бесконечно, поэтому запуск «вслепую» оставит базу пустой и вход вернёт `Invalid login or password`.
 
 SPA использует `/api/v1/auth/login`, `/api/v1/auth/me`, `/api/v1/auth/refresh` и `/api/v1/auth/logout`. Поле `email` от интерфейса передаётся в auth-модуль как `login`; пользователи и серверные сессии хранятся в SQLite. Access token хранится только в памяти вкладки, а HttpOnly-cookie восстанавливает сессию после перезагрузки и выдаёт новый токен по истечении короткого access token. Auth-запросы проверяют заголовок `Origin`.
 

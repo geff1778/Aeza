@@ -113,19 +113,35 @@ def test_app_starts_without_a_token_when_disabled(monkeypatch):
     monkeypatch.delenv("TELEGRAM_BOT_TOKEN", raising=False)
     monkeypatch.delenv("TELEGRAM_ENABLED", raising=False)
     settings = Settings()
-    settings = Settings()
     assert settings.telegram_enabled is False
     assert settings.telegram_bot_token == ""
 
 
-def test_enabling_telegram_without_a_token_is_rejected():
-    with pytest.raises(ValueError):
-        Settings(telegram_enabled=True, telegram_bot_token="", telegram_webhook_secret="s")
+def test_enabling_telegram_without_a_token_does_not_break_the_app(tmp_path):
+    """The reported production symptom, as a regression guard.
+
+    With TELEGRAM_ENABLED=1 and an empty token the old code raised from Settings,
+    so the whole analytics API refused to start. An optional channel must never
+    take the product down: the settings build, the service is simply absent, and
+    /telegram/status explains why.
+    """
+
+    settings = _settings(tmp_path, telegram_enabled=True, telegram_bot_token="")
+    module = load_module("backend.app.domain.module:create")
+    with TestClient(_app(settings, module, tmp_path)) as client:
+        assert client.get("/health").status_code == 200
+        login = client.post("/api/v1/auth/login",
+                            json={"email": TEST_LOGIN, "password": TEST_PASSWORD})
+        headers = {"Authorization": f"Bearer {login.json()['access_token']}"}
+        # Analytics is unaffected.
+        assert client.get("/api/v1/analytics/summary", headers=headers).status_code == 200
+        status = client.get("/api/v1/telegram/status", headers=headers).json()
+        assert status["enabled"] is False
+        assert "TELEGRAM_BOT_TOKEN" in status["detail"]
 
 
 def test_enabling_telegram_without_a_webhook_secret_is_rejected():
     with pytest.raises(ValueError):
-        Settings(telegram_enabled=True, telegram_bot_token="t", telegram_webhook_secret="")
         Settings(telegram_enabled=True, telegram_bot_token="t", telegram_webhook_secret="")
 
 
@@ -661,10 +677,9 @@ def test_scheduler_runs_with_a_pinned_as_of(tmp_path):
     from backend.database import UserRepository
     from core import Core
 
-    auth_settings = _auth_settings(tmp_path)
+    auth_settings = make_test_auth_settings(tmp_path / "auth.db")
     storage = Storage(database)
     calculation = CalculationAdapter(module)
-    auth_settings = make_test_auth_settings(tmp_path / "auth.db")
     auth = AuthService(auth_settings, UserRepository(auth_settings.database))
     runtime = Runtime(settings, database, storage, auth,
                       calculation, Core(storage, calculation, settings.reference_now),

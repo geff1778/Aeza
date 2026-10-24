@@ -5,6 +5,7 @@ import secrets
 import time
 from dataclasses import dataclass
 from threading import BoundedSemaphore
+from typing import Callable
 
 import jwt
 
@@ -24,15 +25,29 @@ class AuthError(Exception):
 
 
 class SessionStore:
-    def __init__(self, users: UserRepository):
+    """Sessions persisted by ``UserRepository``.
+
+    Sessions outlive the process, so expiry is judged against the wall clock
+    (``time.time``), not a monotonic one. The clock stays injectable so tests can
+    advance it without sleeping.
+    """
+
+    def __init__(self, users: UserRepository, clock: Callable[[], float] = time.time):
         self.users = users
+        self.clock = clock
+
+    def now(self) -> int:
+        return int(self.clock())
+
+    def expired(self, session: Session) -> bool:
+        return session.expires_at <= self.now()
 
     def add(self, session: Session) -> None:
         self.users.put_session(session)
 
     def get(self, key: str) -> Session | None:
         session = self.users.get_session(key)
-        if session is not None and session.expires_at <= int(time.time()):
+        if session is not None and self.expired(session):
             self.users.delete_session(key)
             return None
         return session
@@ -112,7 +127,7 @@ class AuthService:
         session = self.sessions.get(session_id)
         if not separator or session is None or not hmac.compare_digest(session.cookie_hash, digest(secret)):
             return None
-        return session if session.expires_at > int(time.time()) else None
+        return session if not self.sessions.expired(session) else None
 
     def user_for_session(self, session: Session) -> User:
         user = self.profiles.get(session.user_id)
@@ -132,14 +147,14 @@ class AuthService:
                 raise jwt.InvalidTokenError
             claims = self.signer.verify_access(token)
             session = self.sessions.get(claims["sid"])
-            if session is None or session.expires_at <= int(time.time()) or session.user_id != claims["sub"]:
+            if session is None or self.sessions.expired(session) or session.user_id != claims["sub"]:
                 raise jwt.InvalidTokenError
         except jwt.InvalidTokenError:
             raise AuthError(401, "invalid_token", "Invalid or expired access token", {"WWW-Authenticate": "Bearer"}) from None
         return session, self.user_for_session(session), claims
 
     def tokens(self, session: Session, user: User, authorization: AuthorizationRequest | None = None) -> dict:
-        expires_in = min(self.settings.access_token_ttl, session.expires_at - int(time.time()))
+        expires_in = min(self.settings.access_token_ttl, session.expires_at - self.sessions.now())
         if expires_in <= 0:
             raise AuthError(401, "invalid_token", "Session expired")
         scope = authorization.scope if authorization else "openid profile"
@@ -183,7 +198,7 @@ class AuthService:
         ):
             raise AuthError(400, "invalid_grant", "Invalid redirect URI or PKCE verifier")
         session = self.sessions.get(record.session_id)
-        if session is None or session.expires_at <= int(time.time()):
+        if session is None or self.sessions.expired(session):
             raise AuthError(400, "invalid_grant", "Session expired")
         try:
             user = self.user_for_session(session)

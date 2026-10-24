@@ -289,7 +289,8 @@ cd ..                                                # запуск из кор�
 
 # 2. Учётные записи
 # Аутентификация вынесена в автономный модуль backend/auth/ со своей SQLite.
-# Создайте пользователя явно (команда запросит пароль дважды):
+# Создайте пользователя явно. В терминале команда запросит пароль дважды;
+# без терминала (скрипт, `docker compose exec -T`) пароль читается из stdin:
 python -m backend.users create analyst@example.com
 
 # 3. Подключить реальный аналитический модуль и заполнить БД снимком
@@ -644,7 +645,11 @@ python -c "import secrets; print(secrets.token_urlsafe(48))"
 docker compose up -d --build
 ```
 
-Интерфейс: <http://localhost:8080>. API: <http://localhost:8000>. Swagger: <http://localhost:8000/api/v1/docs>. Учётные записи создаёт модуль авторизации: `docker compose exec api python -m backend.users create <login>`.
+Интерфейс: <http://localhost:8080>. API: <http://localhost:8000>. Swagger: <http://localhost:8000/api/v1/docs>. Учётные записи создаёт модуль авторизации. Без терминала (`-T`) пароль подаётся на stdin, иначе вход в интерфейс вернёт `Invalid login or password`, потому что база учётных записей останется пустой:
+
+```bash
+printf 'пароль-из-12-символов\nпароль-из-12-символов\n' | docker compose exec -T api python -m backend.users create <login>
+```
 
 Compose запускает PostgreSQL, API и frontend. Seed загружается при первой инициализации пустого тома PostgreSQL. Данные сохраняются между перезапусками. `docker compose down` останавливает сервисы, не удаляя тома.
 
@@ -695,3 +700,12 @@ docker compose exec api python -m backend.users create analyst@example.com
 Команда создания пользователя запросит пароль дважды. Пользователи хранятся в
 `db/auth.sqlite3` в постоянном Docker volume (`auth_data`); ключ RS256
 сохраняется рядом. Приложение не заводит администратора при старте само.
+
+Без интерактивного терминала (`docker compose exec -T`, CI, скрипт) пароль
+читается из stdin. Это важно: `getpass` в контейнере без TTY ждёт ввода
+бесконечно, поэтому команду нельзя выполнить «вслепую» — иначе база учётных
+записей останется пустой, а вход вернёт `Invalid login or password`.
+
+```bash
+printf 'пароль-из-12-символов\nпароль-из-12-символов\n' | docker compose exec -T api python -m backend.users create analyst@example.com
+```

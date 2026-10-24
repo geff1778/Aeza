@@ -1,9 +1,31 @@
 import argparse
 import getpass
 import sqlite3
+import sys
 
 from backend.config import Settings
 from backend.database import UserRepository
+
+
+def read_password() -> str:
+    """Read the new password twice, from a terminal or from stdin.
+
+    ``getpass`` blocks forever when stdin is not a terminal, which is how
+    ``docker compose exec`` (without ``-t``) runs. Falling back to a plain line
+    read lets a deployment provision its first account non-interactively; an
+    empty read is rejected by the password policy, so a silent failure stays
+    visible instead of creating a blank account.
+    """
+
+    if sys.stdin.isatty():
+        password = getpass.getpass("Password: ")
+        repeated = getpass.getpass("Repeat password: ")
+    else:
+        password = sys.stdin.readline().rstrip("\n")
+        repeated = sys.stdin.readline().rstrip("\n")
+    if password != repeated:
+        raise ValueError("Passwords do not match")
+    return password
 
 
 def main() -> None:
@@ -18,10 +40,8 @@ def main() -> None:
         return
     if not arguments.login:
         parser.error("create requires a login")
-    password = getpass.getpass("Password: ")
-    if password != getpass.getpass("Repeat password: "):
-        parser.error("Passwords do not match")
     try:
+        password = read_password()
         user = repository.create(arguments.login, password)
     except (ValueError, sqlite3.IntegrityError) as error:
         parser.error(str(error))
