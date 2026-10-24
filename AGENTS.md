@@ -477,3 +477,9 @@ Compose, `AEZA_AI_BASE_URL=http://172.18.0.1:11434`. `/api/v1/ai/status` →
 `ready`, 691 chunks; `POST /api/v1/ai/customers/{id}/explain` returned a grounded
 answer. CPU inference is slow (~20 s short prompt, up to ~3 min with full RAG
 context), so keep `AEZA_AI_MAX_CONCURRENCY=1` and expect the UI to wait.
+
+## Deck builds: push access
+The `GITHUB_TOKEN` in this sandbox authenticates as `geff1778`, which has only
+`pull` permission on `Pixelminds-hub/aeza-analizer`. `git push origin main` fails
+with 403. Commit locally and ask a maintainer with write access to push, or push
+to a fork. Do not push deck commits to the unrelated `geff1778/Aeza` repo.
