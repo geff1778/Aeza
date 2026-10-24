@@ -182,7 +182,11 @@ def facts() -> dict:
             ),
             "renewal_count": len(summary["upcomingRenewals"]),
         },
-        "categories": summary["customers"]["byCategory"],
+        "categories": {
+            **summary["customers"]["byCategory"],
+            "high_before": summary["customers"]["byCategory"]["high"],
+            "high_after": after_summary["customers"]["byCategory"]["high"],
+        },
         "services_high_risk": summary["services"]["highRisk"],
         "services_high_risk_after": after_summary["services"]["highRisk"],
         "signals": _signal_counts(),
