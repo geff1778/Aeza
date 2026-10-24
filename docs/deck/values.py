@@ -36,6 +36,17 @@ from backend.app.domain.module import create as create_engine  # noqa: E402
 #: Reference instant of the organiser dataset, so results are reproducible.
 AS_OF = datetime(2026, 10, 19, 15, 0, tzinfo=timezone.utc)
 
+#: AI Analyst deployment facts. Unlike the engine figures below, these are not
+#: computed from the dataset: they are the live-inference result recorded in
+#: docs/AI_ANALYST.md (Ollama 0.40.10 + qwen2.5:3b-instruct on CPU). The number
+#: of endpoints is read from backend/app/api/routes_ai.py.
+AI = {
+    "provider": "Ollama",
+    "model": "qwen2.5:3b-instruct",
+    "latency": "≈40–90 с",
+    "endpoints": 5,
+}
+
 #: The client the walkthrough follows.
 CUSTOMER_ID = 10
 #: The service whose factor breakdown the deck explains.
@@ -74,6 +85,33 @@ def _run(weights: dict[str, float]) -> tuple[dict, dict]:
     return customer, analysis.summary
 
 
+def _signal_counts() -> list[tuple[str, int]]:
+    """Factor tallies exactly as the dashboard's "Основные причины риска" counts them.
+
+    Mirrors ``backend.app.domain.analytics``: a factor is counted once per service
+    when it is available and its value is non-zero, then sorted by count. The
+    labels are the engine's own, so a renamed factor cannot leave a stale string
+    on slide 2.
+    """
+    data = json.loads((ROOT / "dataset" / "data.json").read_text(encoding="utf-8"))
+    engine = create_engine()
+    defaults = engine.definition().defaults
+    state = State(
+        generation=1, source_version=1, model_version=1, source=data,
+        settings={"horizonDays": 30, "weights": dict(defaults["weights"]),
+                  "lowMax": 34, "mediumMax": 64},
+        captured_at=AS_OF, as_of=AS_OF, calculated_at=AS_OF,
+    )
+    analysis = engine.calculate(state)
+    counter: dict[str, int] = {}
+    for customer in analysis.customers:
+        for service in customer["services"]:
+            for factor in service["factors"]:
+                if factor.get("available") and factor.get("value"):
+                    counter[factor["label"]] = counter.get(factor["label"], 0) + 1
+    return sorted(counter.items(), key=lambda kv: -kv[1])[:4]
+
+
 def facts() -> dict:
     """All slide values, computed from the engine."""
 
@@ -92,6 +130,10 @@ def facts() -> dict:
 
     contrib_sum = round(sum(f["contribution"] for f in factors), 1)
     weight_total = round(sum(f["weight"] for f in factors), 1)
+    # Same service under the demo weights: the changed factor keeps its
+    # availability, so the denominator shifts by the weight delta.
+    after_factors = [f for f in after_service["factors"] if f.get("available")]
+    weight_total_after = round(sum(f["weight"] for f in after_factors), 1)
     # The three factors with the largest contribution, formatted as the deck
     # spells them out: "3,0 + 2,5 + 2,0 = 7,5".
     top3 = top[:3]
@@ -100,6 +142,7 @@ def facts() -> dict:
     return {
         "as_of": AS_OF.strftime("%Y-%m-%d %H:%M UTC"),
         "dataset": {"accounts": 10, "services": 30, "transactions": 100},
+        "ai": AI,
         "weight_sum": round(sum(base_weights.values()), 1),
         "weights": base_weights,
         "demo": {"factor": DEMO_FACTOR, "from": DEMO_FROM, "to": DEMO_TO,
@@ -123,6 +166,7 @@ def facts() -> dict:
             "factors": [(f["label"], f["weight"], f["contribution"]) for f in factors],
             "contrib_sum": _score(contrib_sum),
             "weight_total": _score(weight_total),
+            "weight_total_after": _score(weight_total_after),
             "top3_terms": " + ".join(_score(f["contribution"]) for f in top3),
             "top3_sum": _score(top3_sum),
         },
@@ -138,7 +182,14 @@ def facts() -> dict:
             ),
             "renewal_count": len(summary["upcomingRenewals"]),
         },
-        "categories": summary["customers"]["byCategory"],
+        "categories": {
+            **summary["customers"]["byCategory"],
+            "high_before": summary["customers"]["byCategory"]["high"],
+            "high_after": after_summary["customers"]["byCategory"]["high"],
+        },
+        "services_high_risk": summary["services"]["highRisk"],
+        "services_high_risk_after": after_summary["services"]["highRisk"],
+        "signals": _signal_counts(),
         "after": {
             "score": _score(after_customer["riskScore"]),
             "service_score": _score(after_service["riskScore"]),
